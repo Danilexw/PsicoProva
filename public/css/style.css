@@ -1,0 +1,207 @@
+/* style.css */
+
+/* Definição de Variáveis - Estilo Clean & Blue */
+:root {
+    --primary: #5367ff;           /* Azul vibrante da imagem */
+    --primary-hover: #3f51d9;
+    --secondary: #212529;         /* Dark para botões de perfil */
+    --bg-light: #f4f7ff;          /* Fundo suave azulado */
+    --white: #ffffff;
+    --text-dark: #000000;         /* Títulos fortes em preto */
+    --text-muted: #67748e;        /* Cinza para textos secundários */
+    --border-color: #e9ecef;
+    --radius: 12px;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+/* Configurações Gerais */
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    overflow-x: hidden;
+}
+
+/* --- BOTÕES ESTILO FOTO --- */
+.btn-main {
+    background: var(--primary) !important;
+    color: var(--white) !important;
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    border: none;
+    display: inline-block;
+}
+
+.btn-main:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(83, 103, 255, 0.3);
+}
+
+/* Botão "Sou Paciente" (Preto na imagem) */
+.bg-dark.btn-main {
+    background: var(--secondary) !important;
+}
+
+/* --- LANDING PAGE (HERO) --- */
+.navbar-lp {
+    padding: 1.2rem 8%;
+    background: var(--white);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.hero {
+    padding: 120px 5% 150px 5%;
+    text-align: center;
+    background: var(--white); /* Fundo branco puro como na imagem */
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin-bottom: 20px;
+}
+
+.hero .text-primary {
+    color: var(--primary) !important;
+}
+
+.hero .lead {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+.badge.bg-primary-subtle {
+    background-color: #f0f3ff !important;
+    color: var(--primary) !important;
+    font-weight: 600;
+    border-radius: 50px;
+}
+
+/* --- DASHBOARD STRUCTURE --- */
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Estilo Clean (Branca com bordas) */
+.sidebar {
+    width: 260px;
+    background-color: var(--white);
+    border-right: 1px solid var(--border-color);
+    padding: 2rem 1.5rem;
+    position: fixed;
+    height: 100vh;
+}
+
+.sidebar h4 {
+    color: var(--primary);
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.main-content {
+    flex: 1;
+    margin-left: 260px; /* Largura da sidebar */
+    padding: 40px 50px;
+}
+
+/* Links da Sidebar */
+.nav-link-custom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: 0.2s;
+}
+
+.nav-link-custom i {
+    font-size: 1.2rem;
+}
+
+.nav-link-custom:hover {
+    background-color: #f8f9ff;
+    color: var(--primary);
+}
+
+.nav-link-custom.active {
+    background-color: #f0f3ff;
+    color: var(--primary);
+}
+
+/* Cards do Painel */
+.card-custom {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 25px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+}
+
+.card-custom h5, .card-custom h2 {
+    font-weight: 700;
+}
+
+/* Tabelas */
+.table thead th {
+    background-color: #f8f9fc;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 15px;
+}
+
+.table tbody td {
+    padding: 15px;
+    vertical-align: middle;
+}
+
+/* Badges de Status */
+.status-badge {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* Estilo para ícone de vídeo no painel do paciente */
+.bg-primary-subtle {
+    background-color: #f0f3ff !important;
+}
+
+/* Responsividade Básica */
+@media (max-width: 992px) {
+    .sidebar { width: 80px; padding: 2rem 0.5rem; }
+    .sidebar span, .sidebar h4 { display: none; }
+    .main-content { margin-left: 80px; }
+    .hero h1 { font-size: 2.5rem; }
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    font-weight: 600;
+}
+
+.card-custom {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}

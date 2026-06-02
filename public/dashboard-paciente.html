@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Sessões - Paciente</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <h4 class="mb-4">Paciente</h4>
+            <nav>
+                <a href="#" class="nav-link-custom active"><i class="bi bi-house"></i> Início</a>
+                <a href="#" class="nav-link-custom"><i class="bi bi-calendar-plus"></i> Agendar</a>
+                <a href="#" class="nav-link-custom"><i class="bi bi-credit-card"></i> Pagamentos</a>
+            </nav>
+            <div class="mt-auto p-3">
+                <button onclick="realizarLogout()" class="btn btn-sm btn-outline-danger w-100">Sair</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <h2 id="welcomeName">Carregando...</h2>
+            <p id="nextSessionAlert" class="text-muted">Verificando agenda...</p>
+
+            <div class="row mt-4">
+                <div class="col-md-8">
+                    <div class="card-custom">
+                        <h5>Sua Próxima Consulta</h5>
+                        <div class="d-flex align-items-center mt-3">
+                            <div class="bg-primary-subtle p-3 rounded me-3 text-primary h4 mb-0">
+                                <i class="bi bi-video"></i>
+                            </div>
+                            <div>
+                                <strong id="sessionDateTime">--/-- às --:--</strong>
+                                <p id="sessionType" class="mb-0 text-muted">Sessão Online</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card-custom text-center">
+                        <p class="text-muted small">Saldo de Sessões</p>
+                        <h2 id="sessionBalance" class="text-primary">00</h2>
+                        <button class="btn btn-outline-primary btn-sm w-100" onclick="registrarLog('Clique Comprar Pacote')">Comprar Pacote</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/paciente.js"></script>
+</body>
+</html>

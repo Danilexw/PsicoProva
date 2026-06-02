@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Psicólogo - PsicoManager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <h4 class="mb-4 text-center text-primary fw-bold">PsicoManager</h4>
+            <nav>
+                <a href="javascript:void(0)" class="nav-link-custom active" id="btn-agenda" onclick="trocarAba('agenda')">
+                    <i class="bi bi-calendar3"></i> Agenda
+                </a>
+                <a href="javascript:void(0)" class="nav-link-custom" id="btn-pacientes" onclick="trocarAba('pacientes')">
+                    <i class="bi bi-people"></i> Pacientes
+                </a>
+                <a href="javascript:void(0)" class="nav-link-custom" id="btn-financeiro" onclick="trocarAba('financeiro')">
+                    <i class="bi bi-wallet2"></i> Financeiro
+                </a>
+                <a href="javascript:void(0)" class="nav-link-custom" id="btn-prontuarios" onclick="trocarAba('prontuarios')">
+                    <i class="bi bi-file-medical"></i> Prontuários
+                </a>
+            </nav>
+            
+            <div class="mt-auto p-3">
+                <button onclick="realizarLogout()" class="btn btn-sm btn-outline-danger w-100">
+                    <i class="bi bi-box-arrow-left"></i> Sair
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div id="aba-agenda" class="secao-dashboard">
+                <div class="d-flex justify-content-between mb-4 align-items-center">
+                    <h2 id="userName" class="fw-bold">Olá, Dr. Ricardo</h2>
+                    <button class="btn btn-primary px-4" onclick="novaSessao()">
+                        <i class="bi bi-plus-lg"></i> Nova Sessão
+                    </button>
+                </div>
+                <div class="card-custom border-0 shadow-sm">
+                    <h5 class="fw-bold mb-3">Agenda de Hoje</h5>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Horário</th>
+                                    <th>Paciente</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="agendaBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="aba-conteudo" class="secao-dashboard d-none">
+                <div class="mb-4">
+                    <h2 id="tituloAba" class="fw-bold">Título da Aba</h2>
+                </div>
+                <div class="card-custom border-0 shadow-sm">
+                    <p id="descricaoAba" class="text-muted">Conteúdo em carregamento...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal fade" id="modalSessao" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">Agendar Nova Sessão</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="formNovaSessao">
+                        <div class="mb-3">
+                            <label class="form-label">Nome do Paciente</label>
+                            <input type="text" id="pacienteNome" class="form-control" placeholder="Digite o nome completo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Data e Hora</label>
+                            <input type="datetime-local" id="sessaoData" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Confirmar Agendamento</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/psicologo.js"></script>
+</body>
+</html>
