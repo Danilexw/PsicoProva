@@ -1,6 +1,14 @@
 {
+  "name": "psico-manager",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'Nenhum build necessario'"
+  },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4"
+  },
+  "devDependencies": {
+    "vercel": "^54.7.1"
   }
 }
