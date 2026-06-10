@@ -37,30 +37,69 @@
 
         <main class="main-content">
             
-            <div id="aba-agenda" class="secao-dashboard">
-                <div class="d-flex justify-content-between mb-4 align-items-center">
-                    <h2 id="userName" class="fw-bold">Olá, Dr. Ricardo</h2>
-                    <button class="btn btn-primary px-4" onclick="novaSessao()">
-                        <i class="bi bi-plus-lg"></i> Nova Sessão
+            <!-- Aba Agenda Atualizada com Filtros Avançados -->
+<div id="aba-agenda" class="secao-dashboard">
+    <div class="d-flex justify-content-between mb-4 align-items-center flex-wrap gap-3">
+        <h2 id="userName" class="fw-bold m-0">Olá, Dr. Ricardo</h2>
+        <button class="btn btn-primary px-4 shadow-sm" onclick="novaSessao()">
+            <i class="bi bi-plus-lg"></i> Nova Sessão
+        </button>
+    </div>
+
+    <!-- BARRA DE FILTROS: Nome e Data -->
+    <div class="card-custom border-0 shadow-sm p-3 mb-4 bg-white">
+        <div class="row g-3 align-items-end">
+            <!-- Filtro por Nome -->
+            <div class="col-md-5 col-sm-12">
+                <label for="filtroAgendaNome" class="form-label small fw-bold text-secondary">
+                    <i class="bi bi-search"></i> Buscar Paciente
+                </label>
+                <input type="text" id="filtroAgendaNome" class="form-control form-control-sm" 
+                       placeholder="Digite o nome do paciente..." oninput="filtrarAgenda()">
+            </div>
+            
+            <!-- Filtro por Data -->
+            <div class="col-md-4 col-sm-12">
+                <label for="filtroAgendaData" class="form-label small fw-bold text-secondary">
+                    <i class="bi bi-calendar3"></i> Filtrar por Data
+                </label>
+                <div class="input-group input-group-sm">
+                    <input type="date" id="filtroAgendaData" class="form-control" onchange="filtrarAgenda()">
+                    <button class="btn btn-outline-secondary" type="button" onclick="limparFiltroAgendaData()" title="Limpar Data">
+                        <i class="bi bi-x-circle"></i>
                     </button>
                 </div>
-                <div class="card-custom border-0 shadow-sm">
-                    <h5 class="fw-bold mb-3">Agenda de Hoje</h5>
-                    <div class="table-responsive">
-                        <table class="table align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Horário</th>
-                                    <th>Paciente</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="agendaBody"></tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
+
+            <!-- Contador e Botão de Reset Completo -->
+            <div class="col-md-3 col-sm-12 text-md-end text-start">
+                <span class="badge bg-light text-dark border p-2 small w-100 text-center text-truncate" id="contadorAgenda">
+                    Carregando sessões...
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela da Agenda -->
+    <div class="card-custom border-0 shadow-sm p-4 bg-white">
+        <h5 class="fw-bold mb-3 text-secondary" id="tituloAgenda">Sessões Agendadas</h5>
+        <div class="table-responsive">
+            <table class="table align-middle table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data e Horário</th>
+                        <th>Paciente</th>
+                        <th>Status</th>
+                        <th class="text-end pe-3">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="agendaBody">
+                    <tr><td colspan="4" class="text-center text-muted">Carregando consultas...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
             <div id="aba-pacientes" class="secao-dashboard d-none">
                 <div class="d-flex justify-content-between mb-4 align-items-center">

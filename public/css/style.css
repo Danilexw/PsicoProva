@@ -205,3 +205,10 @@ body {
     border-radius: 15px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
+
+.celula-evolucao {
+  max-width: 250px; /* Ou o tamanho limite que preferir */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Adiciona os "..." no final */
+}

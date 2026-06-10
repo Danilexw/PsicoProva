@@ -98,7 +98,7 @@ function alimentarPainelConsultas(agendamentos) {
         document.getElementById('proximaConsultaData').innerText = proximaSessaoEncontrada.data;
         document.getElementById('proximaConsultaHora').innerText = `${proximaSessaoEncontrada.hora}h - Presencial/Online`;
     } else {
-        document.getElementById('proximaConsultaData').innerText = "Sem consultas futures";
+        document.getElementById('proximaConsultaData').innerText = "Sem consultas futuras";
         document.getElementById('proximaConsultaHora').innerText = "Agende com o Dr.";
     }
 }

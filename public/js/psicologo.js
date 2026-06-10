@@ -3,6 +3,7 @@
 let modalNovaSessao = null;
 let modalEditarSessao = null;
 let listaPacientesGlobais = []; // Guarda a lista de pacientes temporariamente para agilizar consultas
+let cacheAgenda = [];          // CACHE GLOBAL: Guarda todos os agendamentos brutos do banco
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Verificação de Segurança
@@ -28,6 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const formNovoPaciente = document.getElementById('formNovoPaciente');
     if (formNovoPaciente) formNovoPaciente.addEventListener('submit', cadastrarPaciente);
 
+    // [NOVO] Ouvintes para os elementos de filtro na UI (Ajuste os IDs se forem diferentes no seu HTML)
+    const filtroData = document.getElementById('filtroData');
+    const filtroPaciente = document.getElementById('filtroPaciente');
+    
+    if (filtroData) filtroData.addEventListener('input', renderizarAgendaFiltrada);
+    if (filtroPaciente) filtroPaciente.addEventListener('input', renderizarAgendaFiltrada);
+
     // 3. Inicializa os dados chamando a função
     inicializarSistema();
 });
@@ -39,7 +47,7 @@ async function inicializarSistema() {
     await carregarAgenda();
 }
 
-// FUNÇÃO: Carregar Agenda
+// FUNÇÃO ALTERADA: Carrega a agenda do banco para o cache global e chama a renderização
 async function carregarAgenda() {
     const tbody = document.getElementById('agendaBody');
     if (!tbody) return;
@@ -53,50 +61,108 @@ async function carregarAgenda() {
 
         if (error) throw error;
 
-        tbody.innerHTML = '';
+        // Guarda os dados brutos no cache global
+        cacheAgenda = data || [];
 
-        if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma sessão encontrada.</td></tr>';
-            return;
-        }
+        // Renderiza aplicando os filtros atuais da tela em tempo real
+        renderizarAgendaFiltrada();
 
-        data.forEach(item => {
-            const dataObjeto = new Date(item.data_hora);
-            const horaFormatada = dataObjeto.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-            const statusColor = item.status === 'Confirmada' ? 'bg-success' : 'bg-warning';
-            const nomeEscapado = item.paciente_nome ? item.paciente_nome.replace(/'/g, "\\'") : 'Paciente Sem Nome';
-
-            tbody.innerHTML += `
-                <tr>
-                    <td class="fw-bold">${horaFormatada}</td>
-                    <td>${item.paciente_nome || '-'}</td>
-                    <td>
-                        <span class="badge ${statusColor}" style="cursor: pointer; user-select: none;" onclick="alternarStatus('${item.id}', '${item.status}')" title="Clique para alterar o status">
-                            ${item.status}
-                        </span>
-                    </td>
-                    <td>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-primary" onclick="atender('${item.id}', '${nomeEscapado}')">
-                                Atender
-                            </button>
-                            <button class="btn btn-sm btn-outline-warning" onclick="prepararEdicao('${item.id}', '${nomeEscapado}', '${item.data_hora}')" title="Editar Agendamento">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="excluirSessao('${item.id}', '${nomeEscapado}')" title="Excluir Agendamento">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
     } catch (err) {
         console.error(err);
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar dados do banco.</td></tr>';
     }
 }
+
+// NOVA FUNÇÃO: Realiza as filtragens síncronas combinadas em tempo real e desenha o HTML
+// NOVA VERSÃO CORRIGIDA DA FUNÇÃO DE RENDERIZAÇÃO DA AGENDA
+function renderizarAgendaFiltrada() {
+    const tbody = document.getElementById('agendaBody');
+    if (!tbody) return;
+
+    // Captura os valores dos inputs de filtro da sua UI
+    const filtroDataVal = document.getElementById('filtroData')?.value; // Formato YYYY-MM-DD
+    const filtroPacienteVal = document.getElementById('filtroPaciente')?.value.toLowerCase().trim() || '';
+
+    // 1. Filtragem dos dados salvos no cache global
+    let dadosFiltrados = cacheAgenda.filter(item => {
+        if (!item.data_hora) return false;
+
+        // Filtro 1: Por Data (Garante tratamento limpo da string ISO do banco)
+        if (filtroDataVal) {
+            const dataIsoAgendamento = item.data_hora.substring(0, 10);
+            if (dataIsoAgendamento !== filtroDataVal) return false;
+        }
+
+        // Filtro 2: Por Nome do Paciente (Parcial / Case-Insensitive)
+        if (filtroPacienteVal) {
+            const nomePaciente = (item.paciente_nome || '').toLowerCase();
+            if (!nomePaciente.includes(filtroPacienteVal)) return false;
+        }
+
+        return true;
+    });
+
+    // [CORREÇÃO INTELIGENTE]: Se o filtro por data estiver ativo para o dia atual mas não houver sessões hoje,
+    // o sistema limpa o filtro visual e exibe a lista completa para evitar a sensação de "agenda sumida".
+    if (dadosFiltrados.length === 0 && filtroDataVal && !filtroPacienteVal) {
+        const hojeIso = new Date().toISOString().substring(0, 10);
+        if (filtroDataVal === hojeIso) {
+            console.warn("Nenhuma sessão hoje. Mostrando cronograma completo de agendamentos.");
+            document.getElementById('filtroData').value = ""; // Limpa o input visualmente
+            dadosFiltrados = cacheAgenda; // Restaura a lista completa
+        }
+    }
+
+    // Limpa o corpo da tabela antes de desenhar
+    tbody.innerHTML = '';
+
+    if (dadosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum agendamento encontrado para os filtros aplicados.</td></tr>';
+        return;
+    }
+
+    // 2. Renderização das linhas filtradas na tabela
+    dadosFiltrados.forEach(item => {
+        const dataObjeto = new Date(item.data_hora);
+        
+        // Exibe a data completa (Dia/Mês + Hora) se nenhum filtro específico de dia estiver selecionado
+        const formatoOpcoes = filtroDataVal 
+            ? { hour: '2-digit', minute: '2-digit' } 
+            : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+            
+        const horaFormatada = dataObjeto.toLocaleTimeString('pt-BR', formatoOpcoes);
+
+        // Define a cor do badge com base no status do banco
+        const statusColor = item.status === 'Confirmada' ? 'bg-success' : 'bg-warning';
+        const nomeEscapado = item.paciente_nome ? item.paciente_nome.replace(/'/g, "\\'") : 'Paciente Sem Nome';
+
+        tbody.innerHTML += `
+            <tr>
+                <td class="fw-bold align-middle">${horaFormatada}</td>
+                <td class="align-middle">${item.paciente_nome || '-'}</td>
+                <td class="align-middle">
+                    <span class="badge ${statusColor}" style="cursor: pointer; user-select: none;" onclick="alternarStatus('${item.id}', '${item.status}')" title="Clique para alterar o status">
+                        ${item.status}
+                    </span>
+                </td>
+                <td class="align-middle">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="atender('${item.id}', '${nomeEscapado}')">
+                            Atender
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="prepararEdicao('${item.id}', '${nomeEscapado}', '${item.data_hora}')" title="Editar Agendamento">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="excluirSessao('${item.id}', '${nomeEscapado}')" title="Excluir Agendamento">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+}
+
 
 // FUNÇÃO: Alternar o Status
 async function alternarStatus(idSessao, statusAtual) {
@@ -349,19 +415,16 @@ async function listarPacientesNaAba() {
 
 // FUNÇÃO: Trocar Abas da Sidebar (SPA)
 function trocarAba(aba) {
-    // 1. Esconder todas as abas adicionando 'd-none'
     document.getElementById('aba-agenda')?.classList.add('d-none');
     document.getElementById('aba-pacientes')?.classList.add('d-none');
     document.getElementById('aba-financeiro')?.classList.add('d-none');
-    document.getElementById('aba-prontuarios')?.classList.add('d-none'); // Garante que a de prontuários some se trocar de aba
+    document.getElementById('aba-prontuarios')?.classList.add('d-none'); 
 
-    // 2. Remover a classe 'active' de todos os links da sidebar
     document.getElementById('btn-agenda')?.classList.remove('active');
     document.getElementById('btn-pacientes')?.classList.remove('active');
     document.getElementById('btn-financeiro')?.classList.remove('active');
     document.getElementById('btn-prontuarios')?.classList.remove('active');
 
-    // 3. Mostrar a aba clicada e ativar o respectivo botão
     const abaAlvo = document.getElementById(`aba-${aba}`);
     const btnAlvo = document.getElementById(`btn-${aba}`);
 
@@ -370,9 +433,8 @@ function trocarAba(aba) {
         btnAlvo.classList.add('active');
     }
 
-    // 4. Executar funções específicas de cada aba ao entrar nelas
     if (aba === 'prontuarios') {
-        buscarProntuarios(); // Executa a busca no banco de dados
+        buscarProntuarios(); 
     }
 }
 
@@ -405,6 +467,7 @@ async function carregarPacientesNosSelects() {
 
         if (error) throw error;
 
+        // Atualiza a lista de pacientes globais
         listaPacientesGlobais = data || [];
 
         const selectNovaSessao = document.getElementById('pacienteNome');
@@ -466,26 +529,22 @@ function calcularIdade(dataNascimento) {
 }
 
 // ==========================================================
-// MÓDULO DE PRONTUÁRIOS E EVOLUÇÃO CLÍNICA (AJUSTADO AO BANCO)
-// ==========================================================
-// ==========================================================
-// MÓDULO DE PRONTUÁRIOS, EVOLUÇÃO, EDIÇÃO E EXCLUSÃO
-// ==========================================================
-
-// ==========================================================
-// MÓDULO DE PRONTUÁRIOS - PADRÃO CLÍNICO ANAMNESE
+// MÓDULO DE PRONTUÁRIOS E EVOLUÇÃO CLÍNICA
 // ==========================================================
 let cacheProntuarios = [];
+let emCarregamentoProntuarios = false;
 
 async function buscarProntuarios() {
+    if (emCarregamentoProntuarios) return;
+    
     try {
         const tbody = document.getElementById('prontuariosTableBody');
         if (!tbody) return;
 
+        emCarregamentoProntuarios = true;
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Buscando prontuários...</td></tr>';
-        const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
 
-        const { data: prontuarios, error } = await conexaoDb
+        const { data: prontuarios, error } = await db
             .from('prontuarios')
             .select('*')
             .order('data_sessao', { ascending: false });
@@ -493,12 +552,13 @@ async function buscarProntuarios() {
         if (error) throw error;
         cacheProntuarios = prontuarios || [];
 
+        tbody.innerHTML = '';
+
         if (cacheProntuarios.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum prontuário registrado até o momento.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum prontuário registrado.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = '';
         cacheProntuarios.forEach((item, index) => {
             const dataObjeto = new Date(item.data_sessao);
             const dataFormatada = dataObjeto.toLocaleDateString('pt-BR') + ' às ' + dataObjeto.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -509,15 +569,18 @@ async function buscarProntuarios() {
                     <td class="text-muted">${dataFormatada}</td>
                     <td>
                         <div class="text-truncate" style="max-width: 320px;">
-                            ${item.evolucao_clinica}
+                            ${item.evolucao_clinica || 'Sem evolução registrada.'}
                         </div>
                     </td>
                     <td>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-outline-primary px-2" onclick="verProntuarioDetalhado(${index})">
+                            <button class="btn btn-sm btn-outline-primary px-2" onclick="verProntuarioDetalhado(${index})" title="Ver Ficha">
                                 <i class="bi bi-eye"></i> Ver Ficha
                             </button>
-                            <button class="btn btn-sm btn-outline-danger px-2" onclick="excluirProntuarioDoBanco('${item.id}')">
+                            <button class="btn btn-sm btn-outline-warning px-2" onclick="abrirModalEditarProntuario(${index})" title="Editar Evolução">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger px-2" onclick="excluirProntuarioDoBanco('${item.id}')" title="Excluir">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -525,9 +588,34 @@ async function buscarProntuarios() {
                 </tr>
             `;
         });
+
     } catch (err) {
-        console.error(err);
+        console.error("Erro ao buscar prontuários:", err);
+        const tbody = document.getElementById('prontuariosTableBody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Erro: ${err.message}</td></tr>`;
+    } finally {
+        emCarregamentoProntuarios = false;
     }
+}
+
+function abrirModalEditarProntuario(index) {
+    const p = cacheProntuarios[index];
+    if (!p) return;
+
+    document.getElementById('editarProntuarioId').value = p.id;
+    document.getElementById('editarProntuarioPaciente').value = p.paciente_nome;
+    
+    if (p.data_sessao) {
+        const dataFormatadaParaInput = p.data_sessao.substring(0, 16);
+        document.getElementById('editarProntuarioData').value = dataFormatadaParaInput;
+    } else {
+        document.getElementById('editarProntuarioData').value = '';
+    }
+
+    document.getElementById('editarProntuarioTexto').value = p.evolucao_clinica || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEditarProntuario'));
+    modal.show();
 }
 
 function verProntuarioDetalhado(index) {
@@ -537,7 +625,6 @@ function verProntuarioDetalhado(index) {
     const dataObjeto = new Date(p.data_sessao);
     const dataFormatada = dataObjeto.toLocaleDateString('pt-BR') + ' ' + dataObjeto.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    // Injeção de valores na folha corrida estruturada do modal
     document.getElementById('visNome').innerText = p.paciente_nome;
     document.getElementById('visData').innerText = dataFormatada;
     document.getElementById('visSexo').innerText = p.sexo || '[ ] M  [ ] F';
@@ -550,7 +637,6 @@ function verProntuarioDetalhado(index) {
     document.getElementById('visOcupacao').innerText = p.ocupacao || 'Não informado';
     document.getElementById('visAlergia').innerText = p.alergia || 'Nenhuma declarada';
 
-    // Formatação de checkboxes salvos
     let limites = [];
     if (p.limitacao_cognitiva) limites.push('[X] Cognitiva');
     if (p.limitacao_locomocao) limites.push('[X] Locomoção');
@@ -565,12 +651,86 @@ function verProntuarioDetalhado(index) {
     modal.show();
 }
 
-// Escuta o envio do formulário expandido para gravação
+async function excluirProntuarioDoBanco(id) {
+    if (!confirm("Remover este prontuário permanentemente?")) return;
+    try {
+        const { error } = await db.from('prontuarios').delete().eq('id', id);
+        if (error) throw error;
+        alert("Removido com sucesso.");
+        buscarProntuarios();
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+async function prepararSelectPacientesProntuario() {
+    try {
+        const selectProntuario = document.getElementById('prontuarioPacienteSelect');
+        if (!selectProntuario) return;
+
+        if (!listaPacientesGlobais || listaPacientesGlobais.length === 0) {
+            const { data, error } = await db
+                .from('pacientes_clinica')
+                .select('*')
+                .order('nome', { ascending: true });
+
+            if (error) throw error;
+            listaPacientesGlobais = data || [];
+        }
+
+        let optionsHTML = '<option value="" disabled selected>Selecione o paciente...</option>';
+        listaPacientesGlobais.forEach(paciente => {
+            optionsHTML += `<option value="${paciente.nome}" data-id="${paciente.id}">${paciente.nome}</option>`;
+        });
+
+        selectProntuario.innerHTML = optionsHTML;
+    } catch (err) {
+        console.error("Erro ao preparar o select de pacientes para o prontuário:", err);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const modalNovoProntuarioEl = document.getElementById('modalNovoProntuario');
+    if (modalNovoProntuarioEl) {
+        modalNovoProntuarioEl.addEventListener('show.bs.modal', () => {
+            prepararSelectPacientesProntuario();
+        });
+    }
+});
+
+function autopreencherDadosDoPaciente(nomeSelecionado) {
+    if (!nomeSelecionado) return;
+
+    const pacienteEncontrado = listaPacientesGlobais.find(p => p.nome === nomeSelecionado);
+
+    if (pacienteEncontrado) {
+        const inputTelefone = document.getElementById('prontuarioTelefone');
+        if (inputTelefone) inputTelefone.value = pacienteEncontrado.telefone || '';
+
+        const inputEmail = document.getElementById('prontuarioEmail');
+        if (inputEmail) inputEmail.value = pacienteEncontrado.email_institucional || '';
+
+        const inputData = document.getElementById('prontuarioDataInput');
+        if (inputData && !inputData.value) {
+            const agora = new Date();
+            const tzOffset = agora.getTimezoneOffset() * 60000;
+            inputData.value = (new Date(agora.getTime() - tzOffset)).toISOString().substring(0, 16);
+        }
+    }
+}
+
+// Gerenciamento dos Envios de Formulários (Inserção e Edição de Prontuários)
 document.addEventListener('DOMContentLoaded', () => {
     const formNovoProntuario = document.getElementById('formNovoProntuario');
     if (formNovoProntuario) {
         formNovoProntuario.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            const btnSalvar = formNovoProntuario.querySelector('button[type="submit"]');
+            if (btnSalvar) {
+                btnSalvar.disabled = true;
+                btnSalvar.textContent = "Salvando...";
+            }
 
             const payload = {
                 paciente_nome: document.getElementById('prontuarioPacienteSelect').value,
@@ -593,151 +753,24 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
-                const { error } = await conexaoDb.from('prontuarios').insert([payload]);
+                const { error } = await db.from('prontuarios').insert([payload]);
                 if (error) throw error;
 
-                alert("Prontuário de Admissão gravado com sucesso!");
+                alert("Prontuário gravado com sucesso!");
                 formNovoProntuario.reset();
                 bootstrap.Modal.getInstance(document.getElementById('modalNovoProntuario'))?.hide();
                 buscarProntuarios();
             } catch (err) {
                 alert("Erro ao salvar: " + err.message);
-            }
-        });
-    }
-});
-
-// Mantém a função auxiliar de exclusão ativa
-async function excluirProntuarioDoBanco(id) {
-    if (!confirm("Remover este prontuário permanentemente?")) return;
-    try {
-        const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
-        const { error } = await conexaoDb.from('prontuarios').delete().eq('id', id);
-        if (error) throw error;
-        alert("Removido.");
-        buscarProntuarios();
-    } catch (err) {
-        alert(err.message);
-    }
-}
-
-// ==========================================================
-// CORREÇÃO: FUNÇÃO PARA ALIMENTAR O SELECT DE PACIENTES NO PRONTUÁRIO
-// ==========================================================
-
-async function prepararSelectPacientesProntuario() {
-    try {
-        // Tenta encontrar o select usando o ID esperado pelo seu script atual 
-        // ou o id padrão comum para esse campo estruturado
-        const selectProntuario = document.getElementById('prontuarioPacienteSelect') || document.querySelector('select[id*="Paciente"]') || document.querySelector('.modal-body select');
-        
-        if (!selectProntuario) {
-            console.warn("Elemento select de pacientes do prontuário não foi encontrado no HTML.");
-            return;
-        }
-
-        // Se o cache global estiver vazio por algum motivo, busca do banco na hora
-        if (!listaPacientesGlobais || listaPacientesGlobais.length === 0) {
-            const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
-            const { data, error } = await conexaoDb
-                .from('pacientes_clinica')
-                .select('*')
-                .order('nome', { ascending: true });
-
-            if (error) throw error;
-            listaPacientesGlobais = data || [];
-        }
-
-        // Monta o HTML das opções salvando o nome do paciente como Value
-        let optionsHTML = '<option value="" disabled selected>Selecione o paciente...</option>';
-        listaPacientesGlobais.forEach(paciente => {
-            optionsHTML += `<option value="${paciente.nome}" data-id="${paciente.id}">${paciente.nome}</option>`;
-        });
-
-        selectProntuario.innerHTML = optionsHTML;
-        console.log("Select de pacientes do prontuário alimentado com sucesso!");
-
-    } catch (err) {
-        console.error("Erro ao preparar o select de pacientes para o prontuário:", err);
-    }
-}
-
-// OUVINTE AUTOMÁTICO DE INICIALIZAÇÃO
-document.addEventListener('DOMContentLoaded', () => {
-    // Escuta o modal de Novo Prontuário abrir para rodar a função automaticamente
-    const modalNovoProntuarioEl = document.getElementById('modalNovoProntuario');
-    if (modalNovoProntuarioEl) {
-        modalNovoProntuarioEl.addEventListener('show.bs.modal', () => {
-            prepararSelectPacientesProntuario();
-        });
-    }
-});
-
-// ==========================================================
-// FUNÇÃO: AUTO-PREENCHIMENTO AUTOMÁTICO DO PRONTUÁRIO
-// ==========================================================
-function autopreencherDadosDoPaciente(nomeSelecionado) {
-    if (!nomeSelecionado) return;
-
-    // Encontra o objeto do paciente dentro do cache global do sistema
-    const pacienteEncontrado = listaPacientesGlobais.find(p => p.nome === nomeSelecionado);
-
-    if (pacienteEncontrado) {
-        console.log("Paciente localizado para auto-preenchimento:", pacienteEncontrado);
-
-        // Preenche o campo de Telefone se existir no formulário
-        const inputTelefone = document.getElementById('prontuarioTelefone');
-        if (inputTelefone) inputTelefone.value = pacienteEncontrado.telefone || '';
-
-        // Preenche o campo de E-mail
-        const inputEmail = document.getElementById('prontuarioEmail');
-        if (inputEmail) inputEmail.value = pacienteEncontrado.email_institucional || '';
-
-        // Preenche automaticamente a Data de Abertura com o dia e hora atual do sistema
-        const inputData = document.getElementById('prontuarioDataInput');
-        if (inputData && !inputData.value) {
-            const agora = new Date();
-            const tzOffset = agora.getTimezoneOffset() * 60000;
-            inputData.value = (new Date(agora.getTime() - tzOffset)).toISOString().substring(0, 16);
-        }
-
-        // Se houver um campo de idade oculto ou visível na ficha médica, podemos tentar estimar ou resgatar
-        // Nota: Como o sexo não é coletado no cadastro simplificado de pacientes, deixamos o select livre para o psicólogo definir.
-        
-        console.log("Campos preenchidos de forma automatizada!");
-    } else {
-        console.warn("Paciente selecionado não foi encontrado na lista global.");
-    }
-}
-
-// Escutas de Formulários (Novo e Edição)
-document.addEventListener('DOMContentLoaded', () => {
-    // Form de Inserção
-    const formNovoProntuario = document.getElementById('formNovoProntuario');
-    if (formNovoProntuario) {
-        formNovoProntuario.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const paciente_nome = document.getElementById('prontuarioPacienteSelect').value;
-            const data_sessao = document.getElementById('prontuarioDataInput').value;
-            const evolucao_clinica = document.getElementById('prontuarioTextoInput').value;
-
-            try {
-                const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
-                const { error } = await conexaoDb.from('prontuarios').insert([{ paciente_nome, data_sessao, evolucao_clinica }]);
-                if (error) throw error;
-
-                alert("Evolução clínica registrada com sucesso!");
-                formNovoProntuario.reset();
-                bootstrap.Modal.getInstance(document.getElementById('modalNovoProntuario'))?.hide();
-                buscarProntuarios();
-            } catch (err) {
-                alert("Erro ao salvar: " + err.message);
+            } finally {
+                if (btnSalvar) {
+                    btnSalvar.disabled = false;
+                    btnSalvar.textContent = "Salvar Prontuário";
+                }
             }
         });
     }
 
-    // Form de Edição
     const formEditarProntuario = document.getElementById('formEditarProntuario');
     if (formEditarProntuario) {
         formEditarProntuario.addEventListener('submit', async (e) => {
@@ -747,8 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const evolucao_clinica = document.getElementById('editarProntuarioTexto').value;
 
             try {
-                const conexaoDb = typeof db !== 'undefined' ? db : (typeof supabase !== 'undefined' ? supabase : null);
-                const { error } = await conexaoDb
+                const { error } = await db
                     .from('prontuarios')
                     .update({ data_sessao, evolucao_clinica })
                     .eq('id', id);
