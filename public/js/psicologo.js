@@ -1,4 +1,4 @@
-// js/psicologo.js
+                    // js/psicologo.js
 
 let modalNovaSessao = null;
 let modalEditarSessao = null;
@@ -47,6 +47,35 @@ async function inicializarSistema() {
     await carregarAgenda();
 }
 
+async function carregarSessoes() {
+    // ... sua lógica existente que busca os dados do Supabase (ex: de tabela 'sessoes')
+    const { data: sessoes, error } = await supabase.from('sessoes').select('*');
+
+    if (error) {
+        console.error("Erro ao buscar sessões:", error);
+        return;
+    }
+
+    // SEU CÓDIGO EXISTENTE: Onde você renderiza as linhas no #agendaBody
+    const agendaBody = document.getElementById('agendaBody');
+    agendaBody.innerHTML = ''; 
+    
+    // ... loop for/forEach renderizando as linhas ...
+
+    // CORREÇÃO AQUI: Adicione esta linha logo após terminar de listar os dados
+    const contador = document.getElementById('contadorAgenda');
+    if (contador) {
+        if (sessoes && sessoes.length > 0) {
+            contador.textContent = `${sessoes.length} sessão(ões) encontrada(s)`;
+            // Se preferir deixar um estilo mais limpo de badge:
+            contador.className = "badge bg-primary text-white border p-2 small w-100 text-center text-truncate";
+        } else {
+            contador.textContent = "Nenhuma sessão agendada";
+            contador.className = "badge bg-secondary text-white border p-2 small w-100 text-center text-truncate";
+        }
+    }
+}
+
 // FUNÇÃO ALTERADA: Carrega a agenda do banco para o cache global e chama a renderização
 async function carregarAgenda() {
     const tbody = document.getElementById('agendaBody');
@@ -73,8 +102,19 @@ async function carregarAgenda() {
     }
 }
 
+function filtrarAgenda() {
+    // ... sua lógica de filtro existente varrendo as linhas da tabela ...
+    
+    // Conta quantas linhas da tabela NÃO estão com display 'none'
+    const linhasVisiveis = document.querySelectorAll('#agendaBody tr:not(.d-none)').length;
+    
+    const contador = document.getElementById('contadorAgenda');
+    if (contador) {
+        contador.textContent = `${linhasVisiveis} resultado(s) encontrado(s)`;
+    }
+}
 // NOVA FUNÇÃO: Realiza as filtragens síncronas combinadas em tempo real e desenha o HTML
-// NOVA VERSÃO CORRIGIDA DA FUNÇÃO DE RENDERIZAÇÃO DA AGENDA
+// VERSÃO 100% CORRIGIDA (Contador dinâmico, toLocaleString e otimização de DOM)
 function renderizarAgendaFiltrada() {
     const tbody = document.getElementById('agendaBody');
     if (!tbody) return;
@@ -108,9 +148,16 @@ function renderizarAgendaFiltrada() {
         const hojeIso = new Date().toISOString().substring(0, 10);
         if (filtroDataVal === hojeIso) {
             console.warn("Nenhuma sessão hoje. Mostrando cronograma completo de agendamentos.");
-            document.getElementById('filtroData').value = ""; // Limpa o input visualmente
+            const inputData = document.getElementById('filtroData');
+            if (inputData) inputData.value = ""; // Limpa o input visualmente
             dadosFiltrados = cacheAgenda; // Restaura a lista completa
         }
+    }
+
+    // ATUALIZAÇÃO DO CONTADOR DINÂMICO
+    const contador = document.getElementById('contadorAgenda');
+    if (contador) {
+        contador.textContent = `${dadosFiltrados.length} agendamento(s) encontrado(s)`;
     }
 
     // Limpa o corpo da tabela antes de desenhar
@@ -121,22 +168,24 @@ function renderizarAgendaFiltrada() {
         return;
     }
 
-    // 2. Renderização das linhas filtradas na tabela
+    // 2. Renderização das linhas filtradas na tabela (Otimizada com Array)
+    const linhasHTML = [];
+
     dadosFiltrados.forEach(item => {
         const dataObjeto = new Date(item.data_hora);
         
-        // Exibe a data completa (Dia/Mês + Hora) se nenhum filtro específico de dia estiver selecionado
+        // CORREÇÃO: Usando toLocaleString para aceitar propriedades de data (day, month)
         const formatoOpcoes = filtroDataVal 
             ? { hour: '2-digit', minute: '2-digit' } 
             : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
             
-        const horaFormatada = dataObjeto.toLocaleTimeString('pt-BR', formatoOpcoes);
+        const horaFormatada = dataObjeto.toLocaleString('pt-BR', formatoOpcoes);
 
         // Define a cor do badge com base no status do banco
         const statusColor = item.status === 'Confirmada' ? 'bg-success' : 'bg-warning';
         const nomeEscapado = item.paciente_nome ? item.paciente_nome.replace(/'/g, "\\'") : 'Paciente Sem Nome';
 
-        tbody.innerHTML += `
+        linhasHTML.push(`
             <tr>
                 <td class="fw-bold align-middle">${horaFormatada}</td>
                 <td class="align-middle">${item.paciente_nome || '-'}</td>
@@ -159,8 +208,11 @@ function renderizarAgendaFiltrada() {
                     </div>
                 </td>
             </tr>
-        `;
+        `);
     });
+
+    // Insere todas as linhas de uma vez só no DOM
+    tbody.innerHTML = linhasHTML.join('');
 }
 
 
@@ -274,31 +326,54 @@ if (formNovaSessao) {
         }
     });
 }
-
-// FUNÇÃO: Rastreabilidade / Atender
 async function atender(idSessao, nomePaciente) {
-    alert(`Iniciando atendimento de: ${nomePaciente}`);
+    const valorInput = prompt(`Iniciando atendimento de: ${nomePaciente}\nDigite o valor cobrado por esta sessão (ex: 150.00):`, "150.00");
+    if (valorInput === null) return; // Cancelou o prompt
     
+    const valorLimpo = valorInput.replace(',', '.');
+    const valorSessao = parseFloat(valorLimpo);
+
+    if (isNaN(valorSessao) || valorSessao < 0) {
+        alert("Valor inválido inserido. O atendimento não foi registrado.");
+        return;
+    }
+
+    const dataHojeIso = new Date().toISOString().substring(0, 10);
+
     try {
-        const { error: errorStatus } = await db
-            .from('agendamentos')
-            .update({ status: 'Confirmada' })
-            .eq('id', idSessao);
+        // Executa as operações em paralelo enviando APENAS o que o banco aceita nativamente
+        const [resStatus, resFin] = await Promise.all([
+            // 1. Atualiza o status do agendamento para Confirmada
+            db.from('agendamentos')
+                .update({ status: 'Confirmada' })
+                .eq('id', idSessao),
+            
+            // 2. Insere a receita usando apenas as 4 colunas principais e seguras
+            db.from('financeiro')
+                .insert([{ 
+                    descricao: `Sessão realizada: ${nomePaciente}`, 
+                    tipo: 'Receita', 
+                    valor: valorSessao,
+                    data_competencia: dataHojeIso
+                }])
+        ]);
 
-        if (errorStatus) throw errorStatus;
+        // Verifica se houve erros em alguma das operações
+        if (resStatus.error) throw resStatus.error;
+        if (resFin.error) throw resFin.error;
 
-        const { data: { user } } = await db.auth.getUser();
-        await db.from('logs_sistema').insert([{
-            usuario_id: user.id,
-            acao: `Atendimento iniciado`,
-            detalhes: `Paciente: ${nomePaciente} - Status alterado para Confirmada`
-        }]);
-
-        carregarAgenda();
+        alert(`Sucesso!\n• Atendimento de ${nomePaciente} confirmado.\n• Lançamento de R$ ${valorSessao.toFixed(2)} registrado no Financeiro.`);
+        
+        // Recarrega a lista de agendamentos na tela
+        if (typeof carregarAgenda === 'function') {
+            await carregarAgenda();
+        } else {
+            window.location.reload();
+        }
 
     } catch (err) {
-        console.error("Erro ao iniciar atendimento:", err);
-        alert("Erro ao atualizar o atendimento: " + err.message);
+        console.error("Erro no fluxo integrado:", err);
+        alert("Erro ao processar fluxo automatizado: " + (err.message || "Verifique o console."));
     }
 }
 

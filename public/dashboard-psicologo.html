@@ -20,9 +20,9 @@
                 <a href="javascript:void(0)" class="nav-link-custom" id="btn-pacientes" onclick="trocarAba('pacientes')">
                     <i class="bi bi-people"></i> Pacientes
                 </a>
-                <a href="javascript:void(0)" class="nav-link-custom" id="btn-financeiro" onclick="trocarAba('financeiro')">
+                <!-- <a href="javascript:void(0)" class="nav-link-custom" id="btn-financeiro" onclick="trocarAba('financeiro')">
                     <i class="bi bi-wallet2"></i> Financeiro
-                </a>
+                </a> -->
                 <a href="javascript:void(0)" class="nav-link-custom" id="btn-prontuarios" onclick="trocarAba('prontuarios')">
                     <i class="bi bi-file-earmark-medical"></i> Prontuários
                 </a>
@@ -47,38 +47,39 @@
     </div>
 
     <!-- BARRA DE FILTROS: Nome e Data -->
-    <div class="card-custom border-0 shadow-sm p-3 mb-4 bg-white">
-        <div class="row g-3 align-items-end">
-            <!-- Filtro por Nome -->
-            <div class="col-md-5 col-sm-12">
-                <label for="filtroAgendaNome" class="form-label small fw-bold text-secondary">
-                    <i class="bi bi-search"></i> Buscar Paciente
-                </label>
-                <input type="text" id="filtroAgendaNome" class="form-control form-control-sm" 
-                       placeholder="Digite o nome do paciente..." oninput="filtrarAgenda()">
-            </div>
-            
-            <!-- Filtro por Data -->
-            <div class="col-md-4 col-sm-12">
-                <label for="filtroAgendaData" class="form-label small fw-bold text-secondary">
-                    <i class="bi bi-calendar3"></i> Filtrar por Data
-                </label>
-                <div class="input-group input-group-sm">
-                    <input type="date" id="filtroAgendaData" class="form-control" onchange="filtrarAgenda()">
-                    <button class="btn btn-outline-secondary" type="button" onclick="limparFiltroAgendaData()" title="Limpar Data">
-                        <i class="bi bi-x-circle"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Contador e Botão de Reset Completo -->
-            <div class="col-md-3 col-sm-12 text-md-end text-start">
-                <span class="badge bg-light text-dark border p-2 small w-100 text-center text-truncate" id="contadorAgenda">
-                    Carregando sessões...
-                </span>
+  <!-- BARRA DE FILTROS: Nome e Data -->
+<div class="card-custom border-0 shadow-sm p-3 mb-4 bg-white">
+    <div class="row g-3 align-items-end">
+        <!-- Filtro por Nome (IDs e funções sincronizados) -->
+        <div class="col-md-5 col-sm-12">
+            <label for="filtroPaciente" class="form-label small fw-bold text-secondary">
+                <i class="bi bi-search"></i> Buscar Paciente
+            </label>
+            <input type="text" id="filtroPaciente" class="form-control form-control-sm" 
+                   placeholder="Digite o nome do paciente..." oninput="renderizarAgendaFiltrada()">
+        </div>
+        
+        <!-- Filtro por Data (IDs e funções sincronizados) -->
+        <div class="col-md-4 col-sm-12">
+            <label for="filtroData" class="form-label small fw-bold text-secondary">
+                <i class="bi bi-calendar3"></i> Filtrar por Data
+            </label>
+            <div class="input-group input-group-sm">
+                <input type="date" id="filtroData" class="form-control" onchange="renderizarAgendaFiltrada()">
+                <button class="btn btn-outline-secondary" type="button" onclick="limparFiltroAgendaData()" title="Limpar Data">
+                    <i class="bi bi-x-circle"></i>
+                </button>
             </div>
         </div>
+
+        <!-- Contador -->
+        <div class="col-md-3 col-sm-12 text-md-end text-start">
+            <span class="badge bg-light text-dark border p-2 small w-100 text-center text-truncate" id="contadorAgenda">
+                Carregando sessões...
+            </span>
+        </div>
     </div>
+</div>
 
     <!-- Tabela da Agenda -->
     <div class="card-custom border-0 shadow-sm p-4 bg-white">
@@ -227,7 +228,7 @@
         </div>
     </div>
 </div>
-
+<!-- 
             <div id="aba-financeiro" class="secao-dashboard d-none">
                 <div class="mb-4">
                     <h2 class="fw-bold">Módulo Financeiro</h2>
@@ -237,7 +238,8 @@
                 </div>
             </div>
         </main>
-    </div>
+    </div> -->
+
 
     <div class="modal fade" id="modalSessao" tabindex="-1">
         <div class="modal-dialog">

@@ -1,204 +1,179 @@
-// js/paciente.js
-
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Validação de Segurança básica do lado do cliente
-    const role = localStorage.getItem('user_role');
-    const nomePaciente = localStorage.getItem('user_name');
-
-    if (!role || role !== 'paciente') {
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // 2. Insere os dados básicos na tela
-    document.getElementById('pacienteNomeBoasVindas').innerText = `Olá, ${nomePaciente}`;
-    
-    // Recupera os dados extras do usuário logado se precisar
-    buscarDadosEConsultasDoPaciente(nomePaciente);
+// Garante o carregamento do perfil assim que a página abrir
+document.addEventListener('DOMContentLoaded', async () => {
+    await verificarSessaoPaciente();
 });
 
-/**
- * FUNÇÃO: Carrega os agendamentos do banco cruzando o nome do paciente ativo
- */
-async function buscarDadosEConsultasDoPaciente(nomePaciente) {
+async function verificarSessaoPaciente() {
     try {
-        // Busca os metadados do usuário para pegar o e-mail cadastrado no Auth
-        const { data: { user } } = await db.auth.getUser();
-        if(user) {
-            document.getElementById('pacienteEmailTag').innerText = user.email;
+        // Usamos 'db' que é a instância padrão do seu auth.js
+        const { data: { session }, error: sessionError } = await db.auth.getSession();
+
+        if (sessionError || !session) {
+            console.log("Nenhuma sessão ativa encontrada. Redirecionando...");
+            window.location.href = 'login.html';
+            return;
         }
 
-        // Puxa todos os agendamentos feitos para esse paciente
-        const { data: agendamentos, error } = await db
+        const user = session.user;
+
+        // Busca o perfil na tabela complementar para pegar o nome real (Ex: Ana luisa)
+        const { data: perfil, error: perfilError } = await db
+            .from('perfis')
+            .select('nome, tipo')
+            .eq('id', user.id)
+            .single();
+
+        if (perfilError || !perfil) {
+            console.error("Perfil complementar não encontrado:", perfilError);
+            configurarCamposTela(user.email, user.email);
+            return;
+        }
+
+        // Alimenta a tela com os dados vindos direto do seu Supabase
+        configurarCamposTela(perfil.nome, user.email);
+
+    } catch (err) {
+        console.error("Erro no controle de acesso:", err);
+        window.location.href = 'login.html';
+    }
+}
+
+function configurarCamposTela(nomeReal, emailReal) {
+    // Vinculação exata com os IDs presentes no seu arquivo HTML
+    const campoNome = document.getElementById('pacienteNomeBoasVindas');
+    const campoEmail = document.getElementById('pacienteEmailTag');
+
+    if (campoNome) campoNome.textContent = `Olá, ${nomeReal}`;
+    if (campoEmail) campoEmail.textContent = emailReal;
+
+    // Dispara a busca do histórico de consultas e dados financeiros
+    carregarDadosClinicosEFinanceiros(nomeReal);
+}
+
+async function carregarDadosClinicosEFinanceiros(nomePaciente) {
+    try {
+        // 1. Puxa as sessões reais da tabela 'agendamentos'
+        const { data: agendamentos, error: errorAgendamentos } = await db
             .from('agendamentos')
             .select('*')
             .eq('paciente_nome', nomePaciente)
             .order('data_hora', { ascending: true });
 
-        if (error) throw error;
+        if (errorAgendamentos) throw errorAgendamentos;
 
-        alimentarPainelConsultas(agendamentos);
-        alimentarPainelFinanceiro(agendamentos);
+        // 2. BUSCA OS LANÇAMENTOS REAIS DA TABELA FINANCEIRO
+        // Buscamos os lançamentos onde a descrição contenha o nome do paciente
+        const { data: lancamentosFinanceiros, error: errorFinanceiro } = await db
+            .from('financeiro')
+            .select('*')
+            .ilike('descricao', `%${nomePaciente}%`)
+            .order('data_competencia', { ascending: false });
 
-    } catch (err) {
-        console.error("Erro ao carregar dados do paciente:", err);
-    }
-}
+        if (errorFinanceiro) throw errorFinanceiro;
 
-/**
- * FUNÇÃO: Distribui as consultas nas tabelas, badges e calcula a próxima sessão
- */
-function alimentarPainelConsultas(agendamentos) {
-    const tbody = document.getElementById('historicoConsultasBody');
-    if (!tbody) return;
-
-    if (!agendamentos || agendamentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Você ainda não possui consultas agendadas.</td></tr>';
-        document.getElementById('proximaConsultaData').innerText = "Nenhum agendamento";
-        document.getElementById('proximaConsultaHora').innerText = "Fale com seu psicólogo";
-        return;
-    }
-
-    tbody.innerHTML = '';
-    let total = agendamentos.length;
-    let confirmadas = 0;
-    let proximaSessaoEncontrada = null;
-    const agora = new Date();
-
-    agendamentos.forEach(item => {
-        const dataObjeto = new Date(item.data_hora);
-        const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
-        const horaFormatada = dataObjeto.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        // Seleção dos corpos das tabelas com base no seu HTML
+        const tabelaConsultas = document.getElementById('historicoConsultasBody');
+        const tabelaFinanceiro = document.getElementById('financeiroPacientesBody');
         
-        const statusColor = item.status === 'Confirmada' ? 'bg-success' : 'bg-warning';
-        
-        if (item.status === 'Confirmada') confirmadas++;
+        if (tabelaConsultas) tabelaConsultas.innerHTML = '';
+        if (tabelaFinanceiro) tabelaFinanceiro.innerHTML = '';
 
-        // Descobre qual é a próxima consulta ativa (data futura mais próxima)
-        if (dataObjeto >= agora && !proximaSessaoEncontrada) {
-            proximaSessaoEncontrada = { data: dataFormatada, hora: horaFormatada };
-        }
+        // Contadores para os Badges e cards da Dashboard
+        let totalSessoes = agendamentos.length;
+        let confirmadas = 0;
+        let pendentes = 0;
+        let proximaConsultaDefinida = false;
 
-        // Alimenta a tabela de histórico
-        tbody.innerHTML += `
-            <tr>
-                <td class="fw-bold">${dataFormatada}</td>
-                <td>${horaFormatada}</td>
-                <td><span class="badge ${statusColor}">${item.status}</span></td>
-            </tr>
-        `;
-    });
+        // --- RENDERIZAÇÃO DA ABA DE CONSULTAS ---
+        agendamentos.forEach(sessao => {
+            const objData = new Date(sessao.data_hora);
+            const dataFormatada = objData.toLocaleDateString('pt-BR');
+            const horaFormatada = objData.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    // Atualiza os contadores numéricos do topo
-    document.getElementById('totalConsultasBadge').innerText = total;
-    document.getElementById('consultasConfirmadasBadge').innerText = confirmadas;
+            if (sessao.status === 'Confirmada') confirmadas++;
+            if (sessao.status === 'Pendente') pendentes++;
 
-    // Atualiza o card de destaque da próxima consulta
-    if (proximaSessaoEncontrada) {
-        document.getElementById('proximaConsultaData').innerText = proximaSessaoEncontrada.data;
-        document.getElementById('proximaConsultaHora').innerText = `${proximaSessaoEncontrada.hora}h - Presencial/Online`;
-    } else {
-        document.getElementById('proximaConsultaData').innerText = "Sem consultas futuras";
-        document.getElementById('proximaConsultaHora').innerText = "Agende com o Dr.";
-    }
-}
-
-/**
- * FUNÇÃO: Alimenta a aba financeira gerando faturas simuladas automáticas por consulta
- */
-function alimentarPainelFinanceiro(agendamentos) {
-    const tbody = document.getElementById('financeiroPacientesBody');
-    if (!tbody) return;
-
-    if (!agendamentos || agendamentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum histórico financeiro lançado.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = '';
-    
-    agendamentos.forEach((item, index) => {
-        const dataObjeto = new Date(item.data_hora);
-        const dataFormatada = dataObjeto.toLocaleDateString('pt-BR');
-        
-        // Simula o valor da sessão (ex: R$ 150,00) e define o status com base na confirmação da sessão
-        const valorSessao = "R$ 150,00";
-        const statusPagamento = item.status === 'Confirmada' 
-            ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Pago</span>' 
-            : '<span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill">Aguardando Sessão</span>';
-
-        tbody.innerHTML += `
-            <tr>
-                <td>
-                    <div class="fw-bold">Sessão de Psicoterapia Clínica</div>
-                    <small class="text-muted">Realizada/Agendada em: ${dataFormatada}</small>
-                </td>
-                <td class="fw-semibold text-dark">${valorSessao}</td>
-                <td>${statusPagamento}</td>
-            </tr>
-        `;
-    });
-}
-
-/**
- * FUNÇÃO: Alternância de abas simples (SPA) do lado do paciente
- */
-function trocarAbaPaciente(nomeAba) {
-    document.getElementById('aba-paciente-consultas').classList.add('d-none');
-    document.getElementById('aba-paciente-financeiro').classList.add('d-none');
-    
-    document.getElementById('btn-consultas').classList.remove('active');
-    document.getElementById('btn-financeiro').classList.remove('active');
-
-    if (nomeAba === 'consultas') {
-        document.getElementById('aba-paciente-consultas').classList.remove('d-none');
-        document.getElementById('btn-consultas').classList.add('active');
-    } else if (nomeAba === 'financeiro') {
-        document.getElementById('aba-paciente-financeiro').classList.remove('d-none');
-        document.getElementById('btn-financeiro').classList.add('active');
-    }
-}
-
-// ==========================================
-// FLUXO DE ALTERAÇÃO DE SENHA DO PACIENTE
-// ==========================================
-const formAlterarSenha = document.getElementById('formAlterarSenha');
-
-if (formAlterarSenha) {
-    formAlterarSenha.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const novaSenha = document.getElementById('novaSenhaInput').value;
-        const confirmarSenha = document.getElementById('confirmarNovaSenhaInput').value;
-
-        // 1. Validação básica: as senhas precisam ser iguais
-        if (novaSenha !== confirmarSenha) {
-            alert("As senhas não coincidem! Por favor, verifique.");
-            return;
-        }
-
-        try {
-            // 2. Chama a função nativa do Supabase para atualizar o usuário logado
-            const { data, error } = await db.auth.updateUser({
-                password: novaSenha
-            });
-
-            if (error) throw error;
-
-            // 3. Sucesso!
-            alert("Senha atualizada com sucesso!");
-            
-            // Limpa o formulário e fecha o modal de forma limpa
-            formAlterarSenha.reset();
-            const modalEl = document.getElementById('modalAlterarSenha');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-            if (modalInstance) {
-                modalInstance.hide();
+            // Preenche o bloco de Próxima Consulta (Primeiro agendamento futuro encontrado)
+            if (!proximaConsultaDefinida && sessao.status === 'Pendente' && objData > new Date()) {
+                const pData = document.getElementById('proximaConsultaData');
+                const pHora = document.getElementById('proximaConsultaHora');
+                if (pData) pData.textContent = dataFormatada;
+                if (pHora) pHora.textContent = horaFormatada;
+                proximaConsultaDefinida = true;
             }
 
-        } catch (err) {
-            console.error("Erro ao atualizar a senha:", err);
-            alert("Erro ao alterar a senha: " + err.message);
+            // Alimenta a tabela: Histórico Completo de Sessões
+            if (tabelaConsultas) {
+                const badgeStyle = sessao.status === 'Confirmada' ? 'bg-success' : (sessao.status === 'Cancelada' ? 'bg-danger' : 'bg-warning');
+                tabelaConsultas.innerHTML += `
+                    <tr>
+                        <td>${dataFormatada}</td>
+                        <td>${horaFormatada}</td>
+                        <td><span class="badge ${badgeStyle}">${sessao.status}</span></td>
+                    </tr>
+                `;
+            }
+        });
+
+        // --- RENDERIZAÇÃO DA ABA FINANCEIRA (DADOS REAIS DO BANCO) ---
+        if (tabelaFinanceiro) {
+            if (!lancamentosFinanceiros || lancamentosFinanceiros.length === 0) {
+                tabelaFinanceiro.innerHTML = `<tr><td colspan="3" class="text-center text-muted">Nenhum histórico financeiro lançado.</td></tr>`;
+            } else {
+                lancamentosFinanceiros.forEach(lancamento => {
+                    // Pega o valor real digitado pelo psicólogo
+                    const valorReal = parseFloat(lancamento.valor || 0);
+                    
+                    // Formata a data de competência para exibir ao lado do serviço se quiser, ou usa a descrição direto
+                    const statusFin = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Lançado / Pago</span>';
+                    
+                    tabelaFinanceiro.innerHTML += `
+                        <tr>
+                            <td class="fw-semibold">${lancamento.descricao || 'Sessão de Psicoterapia'}</td>
+                            <td class="fw-bold text-dark">R$ ${valorReal.toFixed(2).replace('.', ',')}</td>
+                            <td>${statusFin}</td>
+                        </tr>
+                    `;
+                });
+            }
         }
-    });
+
+        // Trata o estado caso não possua nenhuma consulta futura agendada
+        if (!proximaConsultaDefinida) {
+            const pData = document.getElementById('proximaConsultaData');
+            if (pData) pData.textContent = "Sem agendamentos";
+        }
+
+        // Atualiza os Badges numéricos superiores da Dashboard
+        const badgeTotal = document.getElementById('totalConsultasBadge');
+        const badgeConfirmadas = document.getElementById('consultasConfirmadasBadge');
+
+        if (badgeTotal) badgeTotal.textContent = totalSessoes;
+        if (badgeConfirmadas) badgeConfirmadas.textContent = confirmadas;
+
+    } catch (err) {
+        console.error("Erro ao renderizar dados clínicos/financeiros:", err.message);
+    }
 }
+// Função para chaveamento visual entre as abas de Consulta e Financeiro
+function trocarAbaPaciente(aba) {
+    const secaoConsultas = document.getElementById('aba-paciente-consultas');
+    const secaoFinanceiro = document.getElementById('aba-paciente-financeiro');
+    const btnConsultas = document.getElementById('btn-consultas');
+    const btnFinanceiro = document.getElementById('btn-financeiro');
+
+    if (aba === 'consultas') {
+        if (secaoConsultas) secaoConsultas.classList.remove('d-none');
+        if (secaoFinanceiro) secaoFinanceiro.classList.add('d-none');
+        if (btnConsultas) btnConsultas.classList.add('active');
+        if (btnFinanceiro) btnFinanceiro.classList.remove('active');
+    } else if (aba === 'financeiro') {
+        if (secaoConsultas) secaoConsultas.classList.add('d-none');
+        if (secaoFinanceiro) secaoFinanceiro.classList.remove('d-none');
+        if (btnConsultas) btnConsultas.classList.remove('active');
+        if (btnFinanceiro) btnFinanceiro.classList.add('active');
+    }
+}
+
+// Expõe a função de troca de abas globalmente para os cliques do HTML funcionarem
+window.trocarAbaPaciente = trocarAbaPaciente;

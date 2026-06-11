@@ -33,12 +33,16 @@ async function realizarLogin(email, password) {
         localStorage.setItem('user_role', perfil.tipo);
         localStorage.setItem('user_name', perfil.nome);
 
-        // 4. Redirecionamento baseado no tipo de perfil cadastrado
-        if (perfil.tipo === 'psicologo') {
-            window.location.href = 'dashboard-psicologo.html';
-        } else if (perfil.tipo === 'paciente') {
-            window.location.href = 'dashboard-paciente.html';
-        } else {
+        // 4. Redirecionamento baseado no tipo de perfil cadastrado no Supabase
+        console.log(`Perfil identificado: ${perfil.tipo}`);
+        
+        if (perfil.tipo === 'admin') {
+    window.location.href = 'dashboard-adm.html'; // Só o Admin vê o financeiro global
+} else if (perfil.tipo === 'psicologo') {
+    window.location.href = 'dashboard-psicologo.html'; // Psicólogo vai para prontuários/agenda
+} else if (perfil.tipo === 'paciente') {
+    window.location.href = 'dashboard-paciente.html';
+} else {
             throw new Error("Tipo de usuário inválido ou não identificado.");
         }
 
@@ -75,3 +79,7 @@ if (loginForm) {
         await realizarLogin(email, password);
     });
 }
+
+// Expõe as funções globalmente caso precise chamá-las via onclick nos botões
+window.realizarLogin = realizarLogin;
+window.realizarLogout = realizarLogout;
